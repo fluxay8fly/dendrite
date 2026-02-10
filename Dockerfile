@@ -17,12 +17,11 @@ RUN --mount=target=. \
     CGO_ENABLED=$([ "$TARGETARCH" = "$USERARCH" ] && echo "1" || echo "0") \
     go build -v -trimpath -o /out/ ./cmd/...
 
-# --- 第二阶段：运行 (这里有修改) ---
+# --- 第二阶段：运行 (关键修改在这里) ---
 FROM alpine:latest
 RUN apk --update --no-cache add curl
-# ... (Label 省略，保持原样即可) ...
 
-# 1. 复制二进制文件 (保持不变)
+# 1. 复制二进制文件
 COPY --from=build /out/create-account /usr/bin/create-account
 COPY --from=build /out/generate-config /usr/bin/generate-config
 COPY --from=build /out/generate-keys /usr/bin/generate-keys
@@ -32,16 +31,16 @@ COPY --from=build /out/dendrite /usr/bin/dendrite
 VOLUME /etc/dendrite
 WORKDIR /etc/dendrite
 
-# 3. ⚠️【新增】把配置文件直接拷进去 (彻底解决找不到文件的问题)
-# 确保你的项目根目录下有这两个文件！
+# 3. ⚠️【关键修改】自动生成 Key，不再依赖本地文件！
+# 这一步保证了 Key 的格式绝对是 Linux 标准的，不会有错。
+RUN /usr/bin/generate-keys -private-key /etc/dendrite/matrix_key.pem
+
+# 4. 复制配置文件 (前提是你的仓库里有这个文件)
+# 确保你的 dendrite.yaml 里写的 private_key 路径是: /etc/dendrite/matrix_key.pem
 COPY dendrite.yaml /etc/dendrite/dendrite.yaml
-COPY matrix_key.pem /etc/dendrite/matrix_key.pem
 
-# 4. 设置入口点
+# 5. 设置启动命令
 ENTRYPOINT ["/usr/bin/dendrite"]
-
-# 5. ⚠️【新增】设置默认参数
-# 这样你在 Zeabur 的 Command 里什么都不用填，它自己就能跑
 CMD ["-config", "/etc/dendrite/dendrite.yaml", "-http-bind-address", ":8008"]
 
 EXPOSE 8008 8448
