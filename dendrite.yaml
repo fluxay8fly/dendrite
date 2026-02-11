@@ -2,7 +2,7 @@ version: 2
 
 global:
   # ⚠️ 再次确认这里是你的域名
-  server_name: zeabur2.dendrite.app
+  server_name: dendrite.zeabur.app
   
   # 私钥路径 (对应 Dockerfile 里的位置)
   private_key: /dendrite-config/matrix_key.pem
