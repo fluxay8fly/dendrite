@@ -1,32 +1,24 @@
 version: 2
-
 global:
-  # ⚠️ 必须修改：换成你 Zeabur 生成的域名（不带 https://）
-  # 例如: dendrite-app.zeabur.app
-  server_name: dendrite.zeabur.app
+  # ⚠️ 记得确认你的域名
+  server_name: dendrite1.zeabur.app
+  
+  # 【修改这里】私钥去新的目录找
+  private_key: /dendrite-config/matrix_key.pem
 
-  # 私钥路径：我们稍后会通过 Zeabur 的 "Config File" 功能挂载这个文件
-  private_key: /etc/dendrite/matrix_key.pem
-
-  # 只有信任的服务器才能加入房间（为了安全，建议限制）
-  # 如果想和整个 Matrix 网络（如 element.io）互通，请设为 false
-  # 如果只想自己团队内部用，请设为 true（推荐）
   federation_disable: true
 
-# 使用内置 SQLite 数据库（存储在挂载卷中，方便备份）
+# 数据库保持在 /etc/dendrite (这样重启才不会丢数据)
 database:
   connection_string: file:/etc/dendrite/dendrite.db
 
-# 媒体文件存储路径（上传的图片、文件）
+# 媒体文件保持在 /etc/dendrite
 media_api:
   base_path: /etc/dendrite/media
 
-# 日志配置（方便在 Zeabur 看日志排错）
 logging:
   - type: std
     level: info
 
-# 监听端口配置
 listen:
-  # HTTP API 端口（Docker 容器内部）
   api: :8008
