@@ -1,47 +1,24 @@
-#syntax=docker/dockerfile:1.2
+# 1. 使用国内镜像源拉取官方【成品】 (跳过漫长的编译过程)
+FROM matrixdotorg/dendrite-monolith:latest
 
-# --- 第一阶段：构建 ---
-FROM --platform=${BUILDPLATFORM} docker.io/golang:1.22-alpine AS base
-RUN apk --update --no-cache add bash build-base curl git
-
-FROM --platform=${BUILDPLATFORM} base AS build
-WORKDIR /src
-ARG TARGETOS
-ARG TARGETARCH
-RUN --mount=target=. \
-    --mount=type=cache,target=/root/.cache/go-build \
-    --mount=type=cache,target=/go/pkg/mod \
-    USERARCH=`go env GOARCH` \
-    GOARCH="$TARGETARCH" \
-    GOOS="linux" \
-    CGO_ENABLED=$([ "$TARGETARCH" = "$USERARCH" ] && echo "1" || echo "0") \
-    go build -v -trimpath -o /out/ ./cmd/...
-
-# --- 第二阶段：运行 ---
-FROM alpine:latest
-RUN apk --update --no-cache add curl
-
-# 复制二进制
-COPY --from=build /out/create-account /usr/bin/create-account
-COPY --from=build /out/generate-config /usr/bin/generate-config
-COPY --from=build /out/generate-keys /usr/bin/generate-keys
-COPY --from=build /out/dendrite /usr/bin/dendrite
-
-# 1. 创建并设置一个【不挂载卷】的配置目录
+# 2. 建立一个专门放配置的目录 (避开 /etc/dendrite 那个挂载卷)
 WORKDIR /dendrite-config
 
-# 2. 在这里生成 Key (绝对安全，不会被覆盖)
-RUN /usr/bin/generate-keys -private-key /dendrite-config/matrix_key.pem
-
-# 3. 复制配置文件到这里
+# 3. 复制你的配置文件到这个新目录
+# (确保你本地确实有 dendrite.yaml 这个文件)
 COPY dendrite.yaml /dendrite-config/dendrite.yaml
 
-# 4. 准备数据目录 (这个目录给 Zeabur 挂载 Volume 用)
-RUN mkdir -p /etc/dendrite
+# 4. 生成 Key 到这个新目录
+RUN /usr/bin/generate-keys -private-key /dendrite-config/matrix_key.pem
+
+# 5. ⚠️ 修正 dendrite.yaml 里的 Key 路径 (用 sed 命令自动改，省得你手动改错)
+# 这一步会自动把你配置文件里的 private_key: ... 改成指向 /dendrite-config/matrix_key.pem
+RUN sed -i 's|private_key: .*|private_key: /dendrite-config/matrix_key.pem|g' /dendrite-config/dendrite.yaml
+
+# 6. 准备数据目录 (这个目录给 Zeabur 挂载 Volume 用，只存数据，不存配置)
 VOLUME /etc/dendrite
 
-# 5. 启动命令指向新的配置路径
+# 7. 启动命令
+# ⚠️ 注意：这里指向了正确的 /dendrite-config/ 目录
 ENTRYPOINT ["/usr/bin/dendrite"]
-CMD ["-config", "/dendrite-config/dendrite.yaml", "-http-bind-address", ":8008"]
-
-EXPOSE 8008 8448
+CMD ["-config", "/dendrite-config/dendrite.yaml", "-http-bind-address", ":8008", "-really-enable-open-registration"]
