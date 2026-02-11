@@ -1,20 +1,68 @@
 version: 2
+
 global:
-  # ⚠️ 记得确认你的域名
-  server_name: dendrite1.zeabur.app
+  # ⚠️ 再次确认这里是你的域名
+  server_name: zeabur-dendrite.app
   
-  # 【修改这里】私钥去新的目录找
+  # 私钥路径 (对应 Dockerfile 里的位置)
   private_key: /dendrite-config/matrix_key.pem
 
+  # 信任设置
   federation_disable: true
 
-# 数据库保持在 /etc/dendrite (这样重启才不会丢数据)
-database:
-  connection_string: file:/etc/dendrite/dendrite.db
+  # ⚠️【关键修改】定义一个全组件通用的数据库连接
+  database:
+    connection_string: file:/etc/dendrite/dendrite.db
+    max_open_conns: 10
+    max_idle_conns: 2
+    conn_max_lifetime: -1
 
-# 媒体文件保持在 /etc/dendrite
+# --- 下面这些是报错缺少的配置，必须显式把它们指回上面的 global.database ---
+
+app_service_api:
+  database:
+    connection_string: file:/etc/dendrite/dendrite.db
+
+federation_api:
+  database:
+    connection_string: file:/etc/dendrite/dendrite.db
+
+key_server:
+  database:
+    connection_string: file:/etc/dendrite/dendrite.db
+
 media_api:
+  database:
+    connection_string: file:/etc/dendrite/dendrite.db
   base_path: /etc/dendrite/media
+
+room_server:
+  database:
+    connection_string: file:/etc/dendrite/dendrite.db
+
+sync_api:
+  database:
+    connection_string: file:/etc/dendrite/dendrite.db
+  real_ip_header: "X-Real-IP"
+
+user_api:
+  account_database:
+    connection_string: file:/etc/dendrite/dendrite.db
+  device_database:
+    connection_string: file:/etc/dendrite/dendrite.db
+
+relay_api:
+  database:
+    connection_string: file:/etc/dendrite/dendrite.db
+
+mscs:
+  database:
+    connection_string: file:/etc/dendrite/dendrite.db
+
+client_api:
+  registration_disabled: false # 允许注册新用户
+  rate_limiting:
+    enabled: false
 
 logging:
   - type: std
